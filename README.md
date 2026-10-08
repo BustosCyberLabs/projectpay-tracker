@@ -76,3 +76,20 @@ https://projectpay-tracker-1.ai.studio
 ## Status
 
 Version 1 - Stable
+
+## Screenshots
+
+### Dashboard
+Track earnings, payments, outstanding balances, and estimated tax reserves.
+
+![ProjectPay Tracker Dashboard](docs/screenshots/dashboard.png)
+
+### Projects
+Manage freelance projects, work hours, payments, and deadlines.
+
+![ProjectPay Tracker Projects](docs/screenshots/projects.png)
+
+### Records
+Review payment history, export financial records, and manage backups.
+
+![ProjectPay Tracker Records](docs/screenshots/records.png)
