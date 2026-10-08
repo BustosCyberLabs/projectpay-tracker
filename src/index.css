@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+html.dark body {
+  background-color: #020617;
+  color: #f1f5f9;
+}
+
+/* Print Styles for Clean Project Pay Sheet PDF / Paper Export */
+@media print {
+  /* Hide the web application UI, modals, buttons, and navigation */
+  body * {
+    visibility: hidden;
+  }
+
+  header,
+  footer,
+  nav,
+  button {
+    display: none !important;
+  }
+
+  /* Make only the printable pay sheet visible and formatted */
+  #printable-pay-sheet,
+  #printable-pay-sheet * {
+    visibility: visible;
+  }
+
+  #printable-pay-sheet {
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 24px !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Force pure black text and transparent/white backgrounds for ink/PDF clarity */
+  #printable-pay-sheet * {
+    color: #000000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  #printable-pay-sheet table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  #printable-pay-sheet th,
+  #printable-pay-sheet td {
+    border: 1px solid #000000 !important;
+    padding: 6px 10px !important;
+  }
+
+  #printable-pay-sheet th {
+    background-color: #f3f4f6 !important;
+    font-weight: bold !important;
+  }
+
+  @page {
+    size: portrait;
+    margin: 1.2cm;
+  }
+}
