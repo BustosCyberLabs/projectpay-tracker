@@ -1,4 +1,4 @@
-import { Project, AppSettings } from '../types';
+import { Project, AppSettings, Payment } from '../types';
 import { getLocalDateString } from './dates';
 
 const PROJECTS_KEY = 'projectpay_tracker_projects_v1';
@@ -110,59 +110,201 @@ export interface RestoreResult {
 
 export function validateBackup(jsonString: string): RestoreResult {
   try {
-    const parsed = JSON.parse(jsonString);
-    if (!parsed || typeof parsed !== 'object') {
-      return { success: false, error: 'Invalid backup file: not a JSON object.' };
+    const parsed: unknown = JSON.parse(jsonString);
+
+    const isRecord = (value: unknown): value is Record<string, unknown> =>
+      value !== null &&
+      typeof value === 'object' &&
+      !Array.isArray(value);
+
+    const validNumber = (value: unknown): value is number =>
+      typeof value === 'number' &&
+      Number.isFinite(value) &&
+      value >= 0;
+
+    const validDate = (value: unknown): value is string => {
+      if (typeof value !== 'string' ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return false;
+      }
+
+      const [year, month, day] = value.split('-').map(Number);
+      const date = new Date(Date.UTC(year, month - 1, day));
+
+      return (
+        date.getUTCFullYear() === year &&
+        date.getUTCMonth() === month - 1 &&
+        date.getUTCDate() === day
+      );
+    };
+
+    const validDateTime = (value: unknown): value is string => {
+      if (typeof value !== 'string') return false;
+      if (value === '') return true;
+
+      const match =
+        /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})$/.exec(value);
+
+      if (!match) return false;
+
+      return (
+        validDate(match[1]) &&
+        Number(match[2]) <= 23 &&
+        Number(match[3]) <= 59
+      );
+    };
+
+    if (!isRecord(parsed)) {
+      return {
+        success: false,
+        error: 'Invalid backup file: expected a JSON object.',
+      };
+    }
+
+    if (parsed.version !== 1 ||
+        parsed.appName !== 'ProjectPay Tracker') {
+      return {
+        success: false,
+        error: 'Invalid or unsupported ProjectPay Tracker backup.',
+      };
     }
 
     if (!Array.isArray(parsed.projects)) {
-      return { success: false, error: 'Invalid backup file: missing projects list.' };
+      return {
+        success: false,
+        error: 'Invalid backup file: missing projects list.',
+      };
     }
 
-    // Validate projects structure
+    const projects: Project[] = [];
+    const projectIds = new Set<string>();
+
     for (let i = 0; i < parsed.projects.length; i++) {
-      const p = parsed.projects[i];
-      if (!p.id || typeof p.name !== 'string') {
-        return { success: false, error: `Invalid project at index ${i}: name or id missing.` };
+      const p: unknown = parsed.projects[i];
+
+      if (!isRecord(p)) {
+        return {
+          success: false,
+          error: `Invalid project at index ${i}.`,
+        };
       }
-      if (p.payType !== 'hourly' && p.payType !== 'fixed') {
-        p.payType = 'hourly';
+
+      if (
+        typeof p.id !== 'string' ||
+        !p.id.trim() ||
+        projectIds.has(p.id) ||
+        typeof p.name !== 'string' ||
+        !p.name.trim() ||
+        typeof p.client !== 'string' ||
+        !['hourly', 'fixed'].includes(String(p.payType)) ||
+        !validNumber(p.rateOrPrice) ||
+        !validNumber(p.paidHours) ||
+        !validNumber(p.unpaidHours) ||
+        !['offer', 'active', 'done'].includes(String(p.status)) ||
+        typeof p.nextAction !== 'string' ||
+        !validDateTime(p.reminderDateTime) ||
+        !(p.dueDate === '' || validDate(p.dueDate)) ||
+        typeof p.notes !== 'string' ||
+        !(validDate(p.createdAt) || (typeof p.createdAt === 'string' && !Number.isNaN(Date.parse(p.createdAt)) && /^\d{4}-\d{2}-\d{2}T/.test(p.createdAt))) ||
+        !Array.isArray(p.payments)
+      ) {
+        return {
+          success: false,
+          error: `Invalid project data at index ${i}.`,
+        };
       }
-      p.rateOrPrice = Math.max(0, Number(p.rateOrPrice) || 0);
-      p.paidHours = Math.max(0, Number(p.paidHours) || 0);
-      p.unpaidHours = Math.max(0, Number(p.unpaidHours) || 0);
-      if (!Array.isArray(p.payments)) {
-        p.payments = [];
-      } else {
-        p.payments = p.payments.map((pmt: any, idx: number) => ({
-          id: pmt.id || `p-${Date.now()}-${idx}`,
-          amount: Math.max(0, Number(pmt.amount) || 0),
-          date: pmt.date || getLocalDateString(),
-          note: pmt.note || '',
-        }));
+
+      projectIds.add(p.id);
+
+      const payments: Payment[] = [];
+      const paymentIds = new Set<string>();
+
+      for (let j = 0; j < p.payments.length; j++) {
+        const payment: unknown = p.payments[j];
+
+        if (
+          !isRecord(payment) ||
+          typeof payment.id !== 'string' ||
+          !payment.id.trim() ||
+          paymentIds.has(payment.id) ||
+          !validNumber(payment.amount) ||
+          !validDate(payment.date) ||
+          (payment.note !== undefined &&
+            typeof payment.note !== 'string')
+        ) {
+          return {
+            success: false,
+            error: `Invalid payment ${j} in project ${i}.`,
+          };
+        }
+
+        paymentIds.add(payment.id);
+
+        payments.push({
+          id: payment.id,
+          amount: payment.amount,
+          date: payment.date,
+          note: typeof payment.note === 'string'
+            ? payment.note
+            : '',
+        });
       }
-      if (!['offer', 'active', 'done'].includes(p.status)) {
-        p.status = 'active';
-      }
+
+      projects.push({
+        id: p.id,
+        name: p.name,
+        client: p.client,
+        payType: p.payType as Project['payType'],
+        rateOrPrice: p.rateOrPrice,
+        paidHours: p.paidHours,
+        unpaidHours: p.unpaidHours,
+        payments,
+        status: p.status as Project['status'],
+        nextAction: p.nextAction,
+        reminderDateTime: p.reminderDateTime,
+        dueDate: p.dueDate,
+        notes: p.notes,
+        createdAt: p.createdAt,
+      });
+    }
+
+    if (!isRecord(parsed.settings)) {
+      return {
+        success: false,
+        error: 'Invalid backup settings.',
+      };
+    }
+
+    const savedSettings = parsed.settings;
+
+    if (
+      !validNumber(savedSettings.taxReservePercent) ||
+      !['system', 'light', 'dark'].includes(
+        String(savedSettings.theme)
+      ) ||
+      typeof savedSettings.hideWelcome !== 'boolean'
+    ) {
+      return {
+        success: false,
+        error: 'Invalid backup settings.',
+      };
     }
 
     const settings: AppSettings = {
-      taxReservePercent:
-        typeof parsed.settings?.taxReservePercent === 'number' && parsed.settings.taxReservePercent >= 0
-          ? parsed.settings.taxReservePercent
-          : DEFAULT_SETTINGS.taxReservePercent,
-      theme: ['system', 'light', 'dark'].includes(parsed.settings?.theme)
-        ? parsed.settings.theme
-        : DEFAULT_SETTINGS.theme,
-      hideWelcome: Boolean(parsed.settings?.hideWelcome),
+      taxReservePercent: savedSettings.taxReservePercent,
+      theme: savedSettings.theme as AppSettings['theme'],
+      hideWelcome: savedSettings.hideWelcome,
     };
 
     return {
       success: true,
-      projects: parsed.projects,
+      projects,
       settings,
     };
-  } catch (err: any) {
-    return { success: false, error: `Could not parse JSON file: ${err.message}` };
+  } catch {
+    return {
+      success: false,
+      error: 'Could not parse or validate the backup file.',
+    };
   }
 }
