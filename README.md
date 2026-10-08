@@ -4,6 +4,26 @@ ProjectPay Tracker is a simple, local-first freelance work tracker for managing 
 
 It is designed to be fast, private, and easy to use without requiring an account, bank connection, backend server, or AI service.
 
+## Screenshots
+
+### Dashboard
+
+Track earnings, payments, outstanding balances, and estimated tax reserves.
+
+![ProjectPay Tracker Dashboard](docs/screenshots/dashboard.png)
+
+### Projects
+
+Manage freelance projects, work hours, payments, and deadlines.
+
+![ProjectPay Tracker Projects](docs/screenshots/projects.png)
+
+### Records
+
+Review payment history, export financial records, and manage backups.
+
+![ProjectPay Tracker Records](docs/screenshots/records.png)
+
 ## Features
 
 - Track hourly and fixed-price projects
@@ -77,19 +97,4 @@ https://projectpay-tracker-1.ai.studio
 
 Version 1 - Stable
 
-## Screenshots
-
-### Dashboard
-Track earnings, payments, outstanding balances, and estimated tax reserves.
-
-![ProjectPay Tracker Dashboard](docs/screenshots/dashboard.png)
-
-### Projects
-Manage freelance projects, work hours, payments, and deadlines.
-
-![ProjectPay Tracker Projects](docs/screenshots/projects.png)
-
-### Records
-Review payment history, export financial records, and manage backups.
-
-![ProjectPay Tracker Records](docs/screenshots/records.png)
+Official release: v1.0.0
